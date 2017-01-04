@@ -20,7 +20,7 @@ from string import replace
 pymysql.install_as_MySQLdb()
 
 #CONFIG = os.path.join('c:\\', 'test', 'config.ini')
-CONFIG = os.path.join('c:\\', 'Users', 'tuziemblo', 'Documents', 'PG', 'Big Data Support', 'BD monitor', 'config.ini')
+CONFIG = os.path.join('c:\\', 'Miniconda2',  'config.ini')
 
 params_blacklist = [
     'default', 
@@ -171,7 +171,7 @@ def csv_to_mysql():
     dbuser = cfg.dbuser
     dbpasswd = cfg.dbpasswd
     db = cfg.db
-    dbtable = cfg.dbtable
+    dbtable = cluster_name_with_timestamp # do not use config.ini
     print ("Establishing connection with MySQL using DBHOST={}, DB={}, "\
         "TABLE={}. (If you wish to change it, please edit config.ini)".format(
             dbhost, 
@@ -182,12 +182,19 @@ def csv_to_mysql():
         host=dbhost, 
         user=dbuser, 
         passwd=dbpasswd, 
-        db=db, 
         charset='utf8', 
-        local_infile=True
+        local_infile=True,
+        autocommit=True
         ) 
     cur = conn.cursor()
-    # create table if doesnt exists  SHOW VARIABLES LIKE '%LOCAL%'
+    db='cloudera_comparisons'
+    cur.execute(("CREATE DATABASE IF NOT EXISTS {}").format(
+        db
+        ))
+    cur.execute(("USE {}").format(
+        db
+        ))
+    # create table if doesnt exists  SHOW VARIABLES LIKE '%LOCAL%';
     try:
         exists = cur.execute((
             """
@@ -200,7 +207,9 @@ def csv_to_mysql():
                 )))
         if not exists:
             print (
-                "Required table does not exist. Creating new table in database")
+                "Creating new table \'{}\' in database \'{}\'").format(
+                dbtable,
+                db)
             cur.execute(("""
                 CREATE TABLE IF NOT EXISTS {0} (cluster VARCHAR(50) 
                 NOT NULL, timestamp DATETIME 
@@ -211,19 +220,19 @@ def csv_to_mysql():
                 role VARCHAR(100))""".format(
                     dbtable
                     )))
-            cur.execute(("""
-                ALTER TABLE {}
-                ADD UNIQUE unique_columns (
-                cluster, 
-                timestamp, 
-                parameter, 
-                keyy, 
-                value(30), 
-                fqdn, 
-                service, 
-                role)""".format(
-                    dbtable
-                    )))
+#            cur.execute(("""
+#                ALTER TABLE {}
+#                ADD UNIQUE unique_columns (
+#                cluster, 
+#                timestamp, 
+#                parameter, 
+#                keyy, 
+#                value(30), 
+#                fqdn, 
+#                service, 
+#                role)""".format(
+#                    dbtable
+#                    )))
     except pymysql.Error, e:
         print ("SQL Error {}: {}".format(e.args[0],e.args[1]))
     # creating temporary csv file
@@ -747,7 +756,7 @@ def gather_details(args, cfg, SECOND_HOST=False):
         print ("Connected successfully")
 
     now = time.strftime('%Y%m%d%H%M%S')
-    cluster_name_with_timestamp = '{}__{}'.format(
+    cluster_name_with_timestamp = '{}_{}'.format(
         cluster_name.replace(' ', '_', 10), 
         now
         )
